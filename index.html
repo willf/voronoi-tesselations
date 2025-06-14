@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Takeshita Voronoi Tiling</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- D3.js and d3-delaunay for plotting and Voronoi diagrams -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3-delaunay@6"></script>
+    <style>
+      body {
+        font-family: "Inter", sans-serif;
+        background-color: #f0f4f8;
+      }
+      canvas {
+        background-color: #ffffff;
+        border: 2px solid #cbd5e1;
+        border-radius: 0.75rem; /* rounded-xl */
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* shadow-md */
+        display: block;
+        margin: 0 auto;
+        max-width: 100%;
+      }
+      input[type="number"]::-webkit-outer-spin-button,
+      input[type="number"]::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+      input[type="number"] {
+        -moz-appearance: textfield;
+      }
+    </style>
+  </head>
+  <body class="p-4 flex flex-col items-center justify-center min-h-screen">
+    <h1 class="text-3xl font-bold text-gray-800 mb-2">
+      Takeshita Voronoi Tiling
+    </h1>
+    <div id="functionDisplay" class="text-lg text-gray-600 mb-6"></div>
+
+    <div class="bg-white p-6 rounded-xl shadow-lg mb-8 w-full max-w-md">
+      <div class="grid grid-cols-2 gap-4 mb-6">
+        <div>
+          <label for="a" class="block text-sm font-medium text-gray-700 mb-1"
+            >a:</label
+          >
+          <input
+            type="number"
+            id="a"
+            value="44"
+            class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+        <div>
+          <label for="b" class="block text-sm font-medium text-gray-700 mb-1"
+            >b:</label
+          >
+          <input
+            type="number"
+            id="b"
+            value="22"
+            class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+        <div>
+          <label for="c" class="block text-sm font-medium text-gray-700 mb-1"
+            >c:</label
+          >
+          <input
+            type="number"
+            id="c"
+            value="11"
+            class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+        <div>
+          <label for="d" class="block text-sm font-medium text-gray-700 mb-1"
+            >d:</label
+          >
+          <input
+            type="number"
+            id="d"
+            value="256"
+            class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+      </div>
+
+      <div class="mb-6">
+        <label
+          for="colorScheme"
+          class="block text-sm font-medium text-gray-700 mb-1"
+          >Color Scheme:</label
+        >
+        <select
+          id="colorScheme"
+          class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+        >
+          <option value="interpolateViridis">Viridis</option>
+          <option value="interpolatePlasma">Plasma</option>
+          <option value="interpolateInferno">Inferno</option>
+          <option value="interpolateMagma">Magma</option>
+          <option value="interpolateWarm">Warm</option>
+          <option value="interpolateCool">Cool</option>
+          <option selected="True" value="interpolateSinebow">Sinebow</option>
+        </select>
+      </div>
+
+      <div class="mb-6">
+        <label
+          for="lineWidthSlider"
+          class="block text-sm font-medium text-gray-700 mb-1"
+          >Line Width: <span id="currentLineWidth">3</span></label
+        >
+        <input
+          type="range"
+          id="lineWidthSlider"
+          min="0.2"
+          max="6"
+          step="0.2"
+          value="3.0"
+          class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer range-xl dark:bg-gray-700"
+        />
+      </div>
+
+      <div class="flex flex-col sm:flex-row justify-between gap-4">
+        <!-- Removed the "Generate Graph" button -->
+        <button
+          id="togglePointsButton"
+          class="w-full sm:w-1/2 bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700 focus:ring-4 focus:ring-gray-500 focus:ring-opacity-50 transition-colors duration-200"
+        >
+          Show Points
+        </button>
+        <button
+          id="saveImageButton"
+          class="w-full sm:w-1/2 bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 focus:ring-4 focus:ring-green-500 focus:ring-opacity-50 transition-colors duration-200"
+        >
+          Save Image
+        </button>
+      </div>
+    </div>
+
+    <canvas id="plotCanvas" width="800" height="600" class="mb-4"></canvas>
+
+    <div
+      id="messageBox"
+      class="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded-md hidden"
+    >
+      <!-- Message content will be inserted here -->
+    </div>
+
+    <div
+      class="description-box bg-white p-6 rounded-xl shadow-lg mt-8 w-full max-w-md text-gray-700 text-sm"
+    >
+      <h2 class="text-xl font-semibold mb-2">What you're seeing:</h2>
+      <p>
+        This interactive visualization displays points generated by the function
+        <span class="font-mono" id="descriptionFunctionDisplay"
+          >f(x) = (ax³ + bx² + cx) mod d</span
+        >. For each point, a
+        <strong class="font-bold">Voronoi region</strong> (or cell) is drawn.
+        Each Voronoi region contains all points on the plane that are closer to
+        its associated data point than to any other data point.
+      </p>
+      <p class="mt-2">
+        The regions are colored based on their area, allowing you to visually
+        identify larger and smaller areas within the tessellation. You can
+        change the function parameters, toggle the visibility of the original
+        points, adjust the border line width, and select different color schemes
+        to explore unique patterns.
+      </p>
+      <p class="mt-2">
+        Based on a Facebook post by
+        <a
+          class="text-blue-600 hover:underline"
+          target="_blank"
+          href="https://www.facebook.com/share/p/1Bwy8nSKJv/
+          . ."
+          >Oscar Takeshita</a
+        >
+        in the "Mathematical Tiling and Tessellation" group. Code generated by
+        Google Gemini 2.5, and refined with ❤️ by
+        <a
+          class="text-blue-600 hover:underline"
+          target="_blank"
+          href="https://www.github.com/willf"
+          >Will Fitzgerald</a
+        >. Code avaiable at
+        <a
+          class="text-blue-600 hover:underline"
+          target="_blank"
+          href="https://www.github.com/willf/voronoi-tesselations"
+          >github.com/willf/voronoi-tesselations</a
+        >.
+      </p>
+      .
+    </div>
+
+    <script>
+      // Get canvas element and its 2D rendering context
+      const canvas = document.getElementById("plotCanvas");
+      const ctx = canvas.getContext("2d");
+      const messageBox = document.getElementById("messageBox");
+      const togglePointsButton = document.getElementById("togglePointsButton");
+      const colorSchemeSelect = document.getElementById("colorScheme");
+      const lineWidthSlider = document.getElementById("lineWidthSlider");
+      const currentLineWidthSpan = document.getElementById("currentLineWidth");
+      const saveImageButton = document.getElementById("saveImageButton");
+      const functionDisplay = document.getElementById("functionDisplay");
+      const descriptionFunctionDisplay = document.getElementById(
+        "descriptionFunctionDisplay"
+      );
+
+      // Get input elements for a, b, c, d
+      const inputA = document.getElementById("a");
+      const inputB = document.getElementById("b");
+      const inputC = document.getElementById("c");
+      const inputD = document.getElementById("d");
+
+      // State variable to control point visibility, now defaulting to false (hidden)
+      let showPoints = false;
+
+      // Event listeners for dynamic updates
+      inputA.addEventListener("input", generatePlot);
+      inputB.addEventListener("input", generatePlot);
+      inputC.addEventListener("input", generatePlot);
+      inputD.addEventListener("input", generatePlot);
+      togglePointsButton.addEventListener("click", togglePointsVisibility);
+      colorSchemeSelect.addEventListener("change", generatePlot);
+      lineWidthSlider.addEventListener("input", () => {
+        currentLineWidthSpan.textContent = lineWidthSlider.value;
+        generatePlot();
+      });
+      saveImageButton.addEventListener("click", saveCanvasAsImage);
+
+      /**
+       * Toggles the visibility of the data points and updates the button text.
+       */
+      function togglePointsVisibility() {
+        showPoints = !showPoints; // Invert the boolean
+        togglePointsButton.textContent = showPoints
+          ? "Hide Points"
+          : "Show Points";
+        generatePlot(); // Regenerate the plot to apply the change
+      }
+
+      /**
+       * Saves the content of the canvas as a PNG image.
+       */
+      function saveCanvasAsImage() {
+        try {
+          // Get the data URL of the canvas content (default is PNG)
+          const dataURL = canvas.toDataURL("image/png");
+
+          // Create a temporary link element
+          const link = document.createElement("a");
+          link.href = dataURL;
+          link.download = "voronoi_plot.png"; // Set the filename for download
+
+          // Programmatically click the link to trigger the download
+          document.body.appendChild(link); // Append to body is good practice
+          link.click();
+          document.body.removeChild(link); // Clean up the temporary link
+        } catch (error) {
+          console.error("Error saving canvas as image:", error);
+          showMessageBox("Failed to save image. Please try again.", "error");
+        }
+      }
+
+      // Function to display messages to the user
+      function showMessageBox(message, type = "info") {
+        messageBox.textContent = message;
+        messageBox.classList.remove("hidden");
+        // Reset existing classes
+        messageBox.classList.remove(
+          "bg-red-100",
+          "border-red-400",
+          "text-red-700",
+          "bg-yellow-100",
+          "border-yellow-400",
+          "text-yellow-700"
+        );
+        // Apply new classes based on type
+        if (type === "error") {
+          messageBox.classList.add(
+            "bg-red-100",
+            "border-red-400",
+            "text-red-700"
+          );
+        } else {
+          // default to info/warning
+          messageBox.classList.add(
+            "bg-yellow-100",
+            "border-yellow-400",
+            "text-yellow-700"
+          );
+        }
+        // Hide message after a few seconds
+        setTimeout(() => {
+          messageBox.classList.add("hidden");
+        }, 5000);
+      }
+
+      /**
+       * The core mathematical function: (a*x^3 + b*x^2 + c*x) mod d
+       * @param {number} x - The input integer.
+       * @param {number} a - Coefficient for x^3.
+       * @param {number} b - Coefficient for x^2.
+       * @param {number} c - Coefficient for x.
+       * @param {number} d - Modulo divisor.
+       * @returns {number} The result of the polynomial modulo d.
+       */
+      function calculateFx(x, a, b, c, d) {
+        // Use BigInt to prevent overflow issues for large intermediate results
+        // before applying the modulo operation, especially for x^3.
+        const bigX = BigInt(x);
+        const bigA = BigInt(a);
+        const bigB = BigInt(b);
+        const bigC = BigInt(c);
+        const bigD = BigInt(d);
+
+        // Calculate each term using BigInt
+        const term1 = bigA * bigX * bigX * bigX; // a * x^3
+        const term2 = bigB * bigX * bigX; // b * x^2
+        const term3 = bigC * bigX; // c * x
+
+        // Sum the terms and apply modulo
+        // The % operator for BigInt returns a negative result if the dividend is negative.
+        // To ensure a positive result for modulo, we add d if the result is negative.
+        let result = (term1 + term2 + term3) % bigD;
+        if (result < 0) {
+          result += bigD;
+        }
+        return Number(result); // Convert back to Number for drawing on canvas
+      }
+
+      /**
+       * Calculates the area of a polygon using the shoelace formula.
+       * @param {Array<Array<number>>} polygon - An array of [x, y] vertex pairs.
+       * @returns {number} The area of the polygon.
+       */
+      function polygonArea(polygon) {
+        if (!polygon || polygon.length < 3) return 0; // Not a polygon or degenerate
+        let area = 0;
+        for (let i = 0; i < polygon.length; i++) {
+          const p1 = polygon[i];
+          const p2 = polygon[(i + 1) % polygon.length]; // Next vertex, wrapping around
+          area += p1[0] * p2[1] - p2[0] * p1[1];
+        }
+        return Math.abs(area / 2);
+      }
+
+      /**
+       * Generates the plot of points and their Voronoi regions.
+       */
+      function generatePlot() {
+        // Get input values
+        const a = parseInt(inputA.value);
+        const b = parseInt(inputB.value);
+        const c = parseInt(inputC.value);
+        const d = parseInt(inputD.value);
+        const selectedColorScheme = colorSchemeSelect.value;
+        const selectedLineWidth = parseFloat(lineWidthSlider.value);
+
+        // Update the function display
+        const functionString = `f(x) = (${a}x³ + ${b}x² + ${c}x) mod ${d}`;
+        functionDisplay.textContent = functionString;
+        descriptionFunctionDisplay.textContent = functionString; // Also update in the description
+
+        // Validate inputs
+        if (isNaN(a) || isNaN(b) || isNaN(c) || isNaN(d)) {
+          showMessageBox(
+            "Please enter valid integer values for a, b, c, and d.",
+            "error"
+          );
+          return;
+        }
+        if (d <= 0) {
+          showMessageBox("Value of d must be a positive integer.", "error");
+          return;
+        }
+        if (d > 10000) {
+          // Limit d to prevent excessive computation for Voronoi
+          showMessageBox(
+            "Value of d is too large. Please use a value less than or equal to 10000 for performance.",
+            "error"
+          );
+          return;
+        }
+
+        // Clear the canvas for a new plot
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const points = [];
+        // Generate points (x, f(x)). We will plot x from 0 up to d-1,
+        // or a maximum of 512 points to keep it performant for visualization.
+        const maxPoints = Math.min(d, 512);
+
+        for (let x = 0; x < maxPoints; x++) {
+          const y = calculateFx(x, a, b, c, d);
+          points.push([x, y]);
+        }
+
+        // If there are too few points, Voronoi might fail
+        if (points.length < 3) {
+          showMessageBox(
+            "Not enough points to generate a Voronoi diagram. Try different parameters.",
+            "error"
+          );
+          return;
+        }
+
+        // Scale the points to fit the canvas
+        // X-axis: 0 to maxPoints-1 maps to 0 to canvas.width
+        // Y-axis: 0 to d-1 maps to 0 to canvas.height (inverted for canvas coordinates)
+
+        const xScale = d3
+          .scaleLinear()
+          .domain([0, maxPoints - 1])
+          .range([0, canvas.width]);
+
+        const yScale = d3
+          .scaleLinear()
+          .domain([0, d - 1])
+          .range([canvas.height, 0]); // Invert Y-axis for canvas
+
+        // Transform points for drawing and Voronoi calculation
+        const transformedPoints = points.map((p) => [
+          xScale(p[0]),
+          yScale(p[1]),
+        ]);
+
+        // Draw Voronoi regions
+        try {
+          // Define the bounding box for the Voronoi diagram
+          const delaunay = d3.Delaunay.from(transformedPoints);
+          const voronoi = delaunay.voronoi([0, 0, canvas.width, canvas.height]);
+
+          const cellAreas = [];
+          for (let i = 0; i < transformedPoints.length; i++) {
+            const polygon = voronoi.cellPolygon(i);
+            if (polygon) {
+              cellAreas.push(polygonArea(polygon));
+            } else {
+              cellAreas.push(0); // If no polygon, treat area as 0
+            }
+          }
+
+          // Find min and max areas for the color scale domain
+          const minArea = d3.min(cellAreas);
+          const maxArea = d3.max(cellAreas);
+
+          // Dynamically select the D3 color interpolator based on user selection
+          const interpolator = d3[selectedColorScheme];
+          if (typeof interpolator !== "function") {
+            console.error(
+              "Invalid color scheme selected:",
+              selectedColorScheme
+            );
+            // Fallback to Viridis if an invalid scheme is somehow selected
+            // This fallback ensures `colorScale` is always defined.
+            const fallbackColorScale = d3
+              .scaleSequential(d3.interpolateViridis)
+              .domain(
+                minArea === maxArea
+                  ? [minArea, minArea + 1]
+                  : [minArea, maxArea]
+              );
+            // Use the fallback if the selected one is invalid
+            const colorScale = fallbackColorScale;
+          }
+
+          // Define a color scale using the selected interpolator
+          // If minArea === maxArea (e.g., only one point or all areas are zero),
+          // the domain should be adjusted to prevent issues.
+          const colorDomain =
+            minArea === maxArea ? [minArea, minArea + 1] : [minArea, maxArea];
+
+          const colorScale = d3
+            .scaleSequential(interpolator)
+            .domain(colorDomain);
+
+          // Draw each cell with a fill color based on its area
+          for (let i = 0; i < transformedPoints.length; i++) {
+            ctx.beginPath();
+            const polygon = voronoi.cellPolygon(i);
+            if (polygon) {
+              voronoi.renderCell(i, ctx);
+              ctx.fillStyle = colorScale(polygonArea(polygon));
+              ctx.fill();
+            }
+          }
+
+          // Draw borders after filling to ensure they are visible on top of the fill
+          ctx.beginPath();
+          voronoi.render(ctx); // Renders all cells as paths for the stroke
+          ctx.strokeStyle = "#a8a29e"; // Gray-400
+          ctx.lineWidth = selectedLineWidth; // Apply the selected line width
+          ctx.stroke();
+        } catch (error) {
+          console.error("Error generating Voronoi diagram:", error);
+          showMessageBox(
+            "Error generating Voronoi diagram. Too few points or unexpected input.",
+            "error"
+          );
+          return;
+        }
+
+        // Draw the individual points on top of the Voronoi cells only if showPoints is true
+        if (showPoints) {
+          ctx.fillStyle = "#1e40af"; // Blue-800
+          transformedPoints.forEach((p) => {
+            ctx.beginPath();
+            ctx.arc(p[0], p[1], 3, 0, 2 * Math.PI); // Draw a circle for each point
+            ctx.fill();
+          });
+        }
+
+        // Add labels or axis lines for clarity (optional, but good for context)
+        // Example X-axis
+        ctx.beginPath();
+        ctx.moveTo(0, canvas.height);
+        ctx.lineTo(canvas.width, canvas.height);
+        ctx.strokeStyle = "#374151"; // Gray-700
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Example Y-axis
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(0, canvas.height);
+        ctx.stroke();
+      }
+
+      // Initial plot generation on page load
+      window.onload = function () {
+        // Set initial button text to "Show Points" since showPoints is false
+        togglePointsButton.textContent = "Show Points";
+        // Set initial line width text
+        currentLineWidthSpan.textContent = lineWidthSlider.value;
+        generatePlot();
+
+        // Make the canvas responsive to window resize
+        const resizeCanvas = () => {
+          generatePlot();
+        };
+
+        window.addEventListener("resize", resizeCanvas);
+      };
+    </script>
+  </body>
+</html>
