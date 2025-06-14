@@ -1,6 +1,6 @@
 # Takeshita Voronoi Tiling
 
-[https://willf.github.io/voronoi-tesselations/](![Image](https://github.com/user-attachments/assets/e482fea9-1e26-4429-a749-36664f33aa52))
+[![Image](https://github.com/user-attachments/assets/e482fea9-1e26-4429-a749-36664f33aa52)](https://willf.github.io/voronoi-tesselations/)
 
 [https://willf.github.io/voronoi-tesselations/](https://willf.github.io/voronoi-tesselations)
 
